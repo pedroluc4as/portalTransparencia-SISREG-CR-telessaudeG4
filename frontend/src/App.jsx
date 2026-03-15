@@ -820,10 +820,47 @@ function App() {
               const bgTema = ehAgendamentoFuturo ? '#f4f9fd' : '#f0fdf4';
               const bordaTema = ehAgendamentoFuturo ? '#b6d4fe' : '#bcf0da';
               const corTextoDetalhes = ehAgendamentoFuturo ? corTema : '#666666';
+              const codSolicitacao = source.codigo_solicitacao || "Não informado"; 
+              
+              const getCoresEtiqueta = (classe) => {
+                switch(classe) {
+                  case 'sucesso': return { bg: '#f0fdf4', border: '#bcf0da', text: '#15803d' };
+                  case 'alerta': return { bg: '#fefce8', border: '#fef08a', text: '#a16207' };
+                  case 'perigo': return { bg: '#fef2f2', border: '#fecaca', text: '#b91c1c' };
+                  case 'laranja': return { bg: '#fff7ed', border: '#fed7aa', text: '#c2410c' };
+                  case 'rosa': return { bg: '#fdf2f8', border: '#fbcfe8', text: '#be185d' };
+                  case 'futuro': return { bg: '#eff6ff', border: '#bfdbfe', text: '#1d4ed8' };
+                  default: return { bg: '#f8fafc', border: '#e2e8f0', text: '#334155' };
+                }
+              };
+              const coresEtiqueta = getCoresEtiqueta(classeCard);
 
               return (
                 <div key={index} className={`result-card tipo-${classeCard}`}>
-                  <h3 className="card-title">{nomeProcedimento}</h3>
+                  
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '15px', marginBottom: '12px' }}>
+                    
+                    <h3 className="card-title" style={{ margin: 0 }}>{nomeProcedimento}</h3>
+                    
+                    <div style={{
+                      backgroundColor: coresEtiqueta.bg,
+                      color: coresEtiqueta.text,
+                      border: `1px solid ${coresEtiqueta.border}`,
+                      padding: '6px 12px',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      fontWeight: '700',
+                      textAlign: 'center',
+                      flexShrink: 0
+                    }}>
+                      <span style={{ display: 'block', fontSize: '10px', fontWeight: 'bold', opacity: 0.8, marginBottom: '2px', textTransform: 'uppercase' }}>
+                        Cód. Solicitação
+                      </span>
+                      {codSolicitacao}
+                    </div>
+
+                  </div>
+
                   <div className="card-details">
                     <div className="info-row">
                       <strong>DATA DA SOLICITAÇÃO:</strong> {formatarData(source.data_solicitacao)}
