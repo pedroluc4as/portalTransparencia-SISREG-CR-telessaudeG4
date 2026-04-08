@@ -6,7 +6,7 @@
 >
 > **📍 Democratizando o acesso à saúde pública com tecnologia e transparência!**
 
-https://github.com/user-attachments/assets/b55e80fa-acc2-4a23-8654-7860c7a4954c
+https://github.com/user-attachments/assets/687af458-b34f-41a1-9e7b-deeafdfbeaa5
 
 ---
 
