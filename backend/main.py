@@ -7,11 +7,14 @@ import os
 import httpx
 import asyncio
 import re
+from apscheduler.schedulers.background import BackgroundScheduler
 
 load_dotenv()
 
 USUARIO = os.getenv("SISREG_USUARIO")
 SENHA = os.getenv("SISREG_SENHA")
+
+CACHE_FILAS = {"dados_fila": [], "ultima_atualizacao": None}
 
 app = FastAPI()
 
@@ -28,6 +31,7 @@ app.add_middleware(
 
 URL_SOLICITACOES_SISREG = "https://sisreg-es.saude.gov.br/solicitacao-ambulatorial-ms-tres-lagoas"
 URL_MARCACOES_SISREG = "https://sisreg-es.saude.gov.br/marcacao-ambulatorial-ms-tres-lagoas"
+URL_HOSPITALAR_SISREG = "https://sisreg-es.saude.gov.br/solicitacao-hospitalar-ms-tres-lagoas"
 
 def normalizar_texto(texto: str):
     if not texto: return ""
@@ -99,16 +103,18 @@ async def consultar_cpf(cpf_usuario: str, nome_mae: str = Query(None)):
 
         tarefas = [
             fazer_requisicao(URL_SOLICITACOES_SISREG, "Solicitações"),
-            fazer_requisicao(URL_MARCACOES_SISREG, "Marcações")
+            fazer_requisicao(URL_MARCACOES_SISREG, "Marcações"),
+            fazer_requisicao(URL_HOSPITALAR_SISREG, "Cirurgias")
         ]
 
         resultados = await asyncio.gather(*tarefas)
         
         lista_solicitacoes = resultados[0]
         lista_marcacoes = resultados[1]
+        lista_hospitalar = resultados[2]
 
-        if not lista_solicitacoes and not lista_marcacoes:
-            print("[FIM] Nenhum registro encontrado.", flush=True)
+        if not lista_solicitacoes and not lista_marcacoes and not lista_hospitalar:
+            print("[FIM] Nenhum registro encontrado em nenhuma base.", flush=True)
             return []
 
         mapa_marcacoes = {}
@@ -122,11 +128,17 @@ async def consultar_cpf(cpf_usuario: str, nome_mae: str = Query(None)):
                     mapa_marcacoes[chave] = []
                 mapa_marcacoes[chave].append(m_source)
 
+        dados_finais = []
+
         if lista_solicitacoes:
+
             for item in lista_solicitacoes:
-                source = item.get("_source", {})
-                dt_s = source.get("data_solicitacao")
+
+                if "_source" not in item:
+                    item["_source"] = {}
+                source = item["_source"]
                 
+                dt_s = source.get("data_solicitacao")    
                 chave = dt_s[:10] if dt_s else None
                 m_dados = {}
                 
@@ -146,9 +158,7 @@ async def consultar_cpf(cpf_usuario: str, nome_mae: str = Query(None)):
                                     tels_encontrados.append(p_limpo)
                 
                 item["_source"]["telefone_unificado"] = ", ".join(tels_encontrados) or "Não informado"
-                
-                endereco = montar_endereco(source) or montar_endereco(m_dados)
-                item["_source"]["endereco_completo"] = endereco or "Endereço não informado"
+                item["_source"]["endereco_completo"] = montar_endereco(source) or montar_endereco(m_dados) or "Endereço não informado"
 
                 if chave in mapa_marcacoes:
                     for campo in ["data_marcacao", "nome_unidade_executante", "status_solicitacao", 
@@ -156,20 +166,45 @@ async def consultar_cpf(cpf_usuario: str, nome_mae: str = Query(None)):
                         if m_dados.get(campo):
                             item["_source"][campo] = m_dados.get(campo)
                             
-            dados_finais = lista_solicitacoes
+            dados_finais.extend(lista_solicitacoes)
             
-        else:
-            for item in lista_marcacoes:
-                source = item.get("_source", {})
+        for lista_m in mapa_marcacoes.values():
+            for m_source in lista_m:
+                novo_item = {"_source": m_source}
+                tel = m_source.get("telefone_paciente") or m_source.get("telefone") or ""
+                novo_item["_source"]["telefone_unificado"] = re.sub(r'\D', '', str(tel)) or "Não informado"
+                novo_item["_source"]["endereco_completo"] = montar_endereco(m_source) or "Endereço não informado"
+                dados_finais.append(novo_item)
+
+        if lista_hospitalar:
+
+            for item in lista_hospitalar:
+
+                if "_source" not in item:
+                    item["_source"] = {}
+                source = item["_source"]
+
+                status_bruto = str(source.get("status", "PENDENTE")).upper().strip()
+                item["_source"]["status_solicitacao"] = status_bruto
                 
                 tel = source.get("telefone_paciente") or source.get("telefone") or ""
                 item["_source"]["telefone_unificado"] = re.sub(r'\D', '', str(tel)) or "Não informado"
                 item["_source"]["endereco_completo"] = montar_endereco(source) or "Endereço não informado"
                 
-            dados_finais = lista_marcacoes
+                item["_source"]["tipo_registro"] = "HOSPITALAR"
+                
+            dados_finais.extend(lista_hospitalar)
+
+        if not dados_finais:
+            print("[FIM] Nenhum registro sobrou após o processamento.", flush=True)
+            return []
         
-        primeiro_registro = dados_finais[0].get("_source", {})
-        nome_mae_banco = primeiro_registro.get("no_mae_usuario", "")
+        nome_mae_banco = ""
+        for item in dados_finais:
+            mae = item.get("_source", {}).get("no_mae_usuario", "")
+            if mae and str(mae).strip():
+                nome_mae_banco = str(mae).strip()
+                break
 
         if not fase_validacao:
             print(f"[API] Total Unificado: {len(dados_finais)}", flush=True)
@@ -225,3 +260,91 @@ async def consultar_cpf(cpf_usuario: str, nome_mae: str = Query(None)):
         if isinstance(e, HTTPException):
             raise e
         return []
+
+# VERSION 2.0
+
+# 1. Fila de espera por procedimento    
+async def atualizar_cache_filas():
+    global CACHE_FILAS
+    try:
+        print("[CRON] Iniciando atualização diária das filas às 04:00 da manhã...", flush=True)
+
+        payload = {
+            "size": 10000, 
+            "_source": [
+                "descricao_interna_procedimento",
+                "procedimentos.descricao_interna",
+                "status_solicitacao"
+            ],
+            "query": {
+                "bool": {
+                    "must": [
+                        { "term": { "codigo_central_reguladora": "500830" } }
+                    ],
+                    "should": [
+                        { "match_phrase": { "status_solicitacao": "SOLICITAÇÃO / PENDENTE / REGULADOR" } },
+                        { "match_phrase": { "status_solicitacao": "SOLICITAÇÃO / PENDENTE / FILA DE ESPERA" } },
+                        { "match_phrase": { "status_solicitacao": "SOLICITAÇÃO / REENVIADA / REGULADOR" } }
+                    ],
+                    "minimum_should_match": 1
+                }
+            }
+        }
+
+        async with httpx.AsyncClient(timeout=30.0, verify=False) as client:
+            resp = await client.post(
+                f"{URL_SOLICITACOES_SISREG}/_search", 
+                json=payload, 
+                headers={"Content-Type": "application/json"}, 
+                auth=(USUARIO, SENHA)
+            )
+            dados_json = resp.json()
+        
+        registros = dados_json.get("hits", {}).get("hits", [])
+        
+        mapa_procedimentos = {}
+
+        for hit in registros:
+            source = hit.get("_source", {})
+            
+            procedimentos = source.get("procedimentos", [])
+            
+            if not procedimentos:
+                procedimentos = [{"descricao_interna": source.get("descricao_interna_procedimento")}]
+                
+            for proc in procedimentos:
+                nome_original = proc.get("descricao_interna")
+                
+                if not nome_original:
+                    nome_original = source.get("descricao_interna_procedimento")
+                    
+                if not nome_original:
+                    nome_original = "PROCEDIMENTO NÃO INFORMADO"
+                    
+                nome_limpo = nome_original.strip().upper()
+                
+                if nome_limpo in mapa_procedimentos:
+                    mapa_procedimentos[nome_limpo] += 1
+                else:
+                    mapa_procedimentos[nome_limpo] = 1
+
+        dados_fila = [{"especialidade": k, "quantidade": v} for k, v in mapa_procedimentos.items()]
+        dados_fila.sort(key=lambda x: x["quantidade"], reverse=True)
+
+        CACHE_FILAS["dados_fila"] = dados_fila
+        CACHE_FILAS["ultima_atualizacao"] = datetime.now().strftime("%d/%m/%Y às %H:%M")
+        print("[CRON] Cache das filas atualizado com sucesso!", flush=True)
+
+    except Exception as e:
+        print(f"[CRON ERRO] Falha ao atualizar cache: {e}", flush=True)
+
+@app.get("/api/filas-espera")
+async def obter_filas_espera():
+    return CACHE_FILAS
+
+@app.on_event("startup")
+async def iniciar_agendador():
+    scheduler = BackgroundScheduler()
+    scheduler.add_job(lambda: asyncio.run(atualizar_cache_filas()), 'cron', hour=4, minute=0)
+    scheduler.start()
+    asyncio.create_task(atualizar_cache_filas())

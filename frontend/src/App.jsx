@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react'
 import axios from 'axios'
 import './App.css'
 import logoPrefeitura from './assets/logo-prefeitura.png'
+import FilaPublica from './components/FilaPublica.jsx'
 
 const ITENS_POR_PAGINA = 5;
 
@@ -142,6 +143,11 @@ const sanitizarMotivo = (textoRaw) => {
   if (!textoRaw) return "";
 
   let textoLimpo = String(textoRaw)
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/(?:negada|cancelada|devolvida)\s+dia.*?por\s+[\w_]+/ig, ' ')
+    .replace(/\d{2}[./]\d{2}[./]\d{4}\s*-\s*\d{2}:\d{2}:\d{2}.*?(?=\s|-|$)/ig, ' ');
+
+  textoLimpo = textoLimpo
     .replace(/[,;:]+\s*\./g, '.')
     .replace(/\.\s*,/g, '.')
     .replace(/\s+/g, ' ');
@@ -209,7 +215,7 @@ const filtrarUltimos5Anos = (listaPedidos) => {
     
     if (ano >= anoLimite) return true;
     
-    const statusTraduzido = traduzirStatus(source.status_solicitacao);
+    const statusTraduzido = traduzirStatus(source.status_solicitacao, source.tipo_registro);
     const situacao = getSituacaoInfo(statusTraduzido);
     
     if (situacao.label === "PENDENTE") return true;
@@ -243,11 +249,24 @@ const PLANILHA_STATUS = {
   "FALTA": "Paciente não compareceu"
 };
 
-const traduzirStatus = (statusRaw) => {
+const traduzirStatus = (statusRaw, tipoRegistro = "AMBULATORIAL") => {
   if (!statusRaw) return "Solicitação não encontrada";
-  const st = String(statusRaw).toUpperCase(); 
+  const st = String(statusRaw).toUpperCase().trim();
 
   if (PLANILHA_STATUS[st]) return PLANILHA_STATUS[st];
+
+  if (tipoRegistro === "HOSPITALAR") {
+    switch (st) {
+      case 'PENDENTE':  return "Pendente de análise hospitalar";
+      case 'APROVADA':  return "Cirurgia Aprovada / Agendada";
+      case 'NEGADA':    return "Solicitação de cirurgia negada";
+      case 'CANCELADA': return "Cirurgia Cancelada";
+      case 'DEVOLVIDA': return "Devolvida para ajustes médicos";
+      case 'REENVIADA': return "Reenviada para análise hospitalar";
+      case 'TROCA':     return "Troca de procedimento solicitada";
+      default:          return statusRaw; 
+    }
+  }
 
   if (st.includes("FALTA")) return PLANILHA_STATUS["FALTA"];
   if (st.includes("AGENDAMENTO") && st.includes("CANCELADO")) return "Agendamento cancelado";
@@ -296,8 +315,31 @@ const LISTA_SITUACOES = [
   "🔵 AGENDAMENTO FUTURO"
 ];
 
+const getCoresEtiqueta = (classe) => {
+    switch(classe) {
+      case 'sucesso': return { bg: '#f0fdf4', border: '#bcf0da', text: '#15803d' };
+      case 'alerta': return { bg: '#fefce8', border: '#fef08a', text: '#a16207' };
+      case 'perigo': return { bg: '#fef2f2', border: '#fecaca', text: '#b91c1c' };
+      case 'laranja': return { bg: '#fff7ed', border: '#fed7aa', text: '#c2410c' };
+      case 'rosa': return { bg: '#fdf2f8', border: '#fbcfe8', text: '#be185d' };
+      case 'futuro': return { bg: '#eff6ff', border: '#bfdbfe', text: '#1d4ed8' };
+      default: return { bg: '#f8fafc', border: '#e2e8f0', text: '#334155' };
+    }
+  };
+
 const getNomeProcedimento = (src) => {
   if (!src) return "Procedimento não informado";
+
+  if (src.tipo_registro === "HOSPITALAR") {
+    const macro = src.nome_grupo_procedimento;
+    const micro = src.descricao_interna_procedimento || src.descricao_procedimento;
+    
+    if (macro && micro && macro.trim().toUpperCase() !== micro.trim().toUpperCase()) {
+      return `${macro.toUpperCase()} - ${micro.toUpperCase()}`;
+    }
+
+    return (micro || macro || "Cirurgia não detalhada").toUpperCase();
+  }
 
   const raw = src.nome_procedimento || 
               src.descricao_procedimento || 
@@ -371,6 +413,7 @@ const getNomeProcedimento = (src) => {
 };
 
 function App() {
+  const [visaoAtual, setVisaoAtual] = useState('consulta');
   const [cpf, setCpf] = useState('')
   const [pedidos, setPedidos] = useState([])
   const [loading, setLoading] = useState(false)
@@ -385,7 +428,7 @@ function App() {
   const [captchaDigitado, setCaptchaDigitado] = useState('');
 
   const gerarCaptcha = () => {
-    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     let resultado = "";
     for (let i = 0; i < 6; i++) {
       resultado += chars.charAt(Math.floor(Math.random() * chars.length));
@@ -401,6 +444,7 @@ function App() {
   const [filtroAno, setFiltroAno] = useState('TODOS')
   const [filtroStatus, setFiltroStatus] = useState('TODOS')
   const [filtroSituacao, setFiltroSituacao] = useState('TODOS')
+  const [filtroTipo, setFiltroTipo] = useState('TODOS')
   const [ordem, setOrdem] = useState('PROCEDIMENTO')
   const [paginaAtual, setPaginaAtual] = useState(1);
 
@@ -445,6 +489,7 @@ function App() {
     setFiltroAno('TODOS')
     setFiltroStatus('TODOS')
     setFiltroSituacao('TODOS')
+    setFiltroTipo('TODOS')
     setPaginaAtual(1)
 
     try {
@@ -551,12 +596,18 @@ function App() {
   const listaExibida = useMemo(() => {
     let lista = [...pedidos];
     if (filtroAno !== 'TODOS') lista = lista.filter(item => extrairAno(item._source?.data_solicitacao) === filtroAno);
-    if (filtroStatus !== 'TODOS') lista = lista.filter(item => traduzirStatus(item._source?.status_solicitacao) === filtroStatus);
+    if (filtroStatus !== 'TODOS') lista = lista.filter(item => traduzirStatus(item._source?.status_solicitacao, item._source?.tipo_registro) === filtroStatus);
     
+    if (filtroTipo === 'HOSPITALAR') {
+      lista = lista.filter(item => item._source?.tipo_registro === 'HOSPITALAR');
+    } else if (filtroTipo === 'AMBULATORIAL') {
+      lista = lista.filter(item => item._source?.tipo_registro !== 'HOSPITALAR');
+    }
+
     if (filtroSituacao !== 'TODOS') {
         lista = lista.filter(item => {
             const source = item._source || {};
-            const traduzido = traduzirStatus(source.status_solicitacao);
+            const traduzido = traduzirStatus(source.status_solicitacao, source.tipo_registro);
             const info = getSituacaoInfo(traduzido);
             
             const dataDoAgendamento = source.data_marcacao || source.data_atualizacao_marcacao;
@@ -593,11 +644,11 @@ function App() {
       if (ordem === 'DATA_ASC') return getDataValida(sourceA) - getDataValida(sourceB);
       
       if (ordem === 'UNIDADE') return String(sourceA.nome_unidade_solicitante || "").localeCompare(String(sourceB.nome_unidade_solicitante || ""));
-      if (ordem === 'STATUS') return String(traduzirStatus(sourceA.status_solicitacao)).localeCompare(String(traduzirStatus(sourceB.status_solicitacao)));
+      if (ordem === 'STATUS') return String(traduzirStatus(sourceA.status_solicitacao, sourceA.tipo_registro)).localeCompare(String(traduzirStatus(sourceB.status_solicitacao, sourceB.tipo_registro)));
       return 0;
     });
     return lista;
-  }, [pedidos, filtroAno, filtroSituacao, filtroStatus, ordem]);
+  }, [pedidos, filtroAno, filtroSituacao, filtroStatus, filtroTipo, ordem]);
 
   useEffect(() => { setPaginaAtual(1); }, [listaExibida]);
 
@@ -613,11 +664,44 @@ function App() {
       <header className="app-header">
         <img src={logoPrefeitura} alt="Prefeitura" className="header-logo" />
         <h1 className="app-title">PORTAL DA TRANSPARÊNCIA<br />CENTRAL DE REGULAÇÃO</h1>
-        <p className="app-description">
-          Digite seu CPF abaixo e se informe sobre a situação atualizada dos seus agendamentos, exames e consultas.
-        </p>
+
+        <div className="nav-abas-container">
+          <button 
+            type="button" 
+            className={`aba-nav ${visaoAtual === 'consulta' ? 'aba-ativa' : ''}`} 
+            onClick={() => { 
+              setVisaoAtual('consulta'); 
+              cancelarConfirmacao();
+            }}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            Consulta Individual
+          </button>
+          
+          <button 
+            type="button" 
+            className={`aba-nav ${visaoAtual === 'filas' ? 'aba-ativa' : ''}`} 
+            onClick={() => { 
+              setVisaoAtual('filas');
+              cancelarConfirmacao();
+            }}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+            Painel de Filas
+          </button>
+        </div>
       </header>
-      
+
+      {visaoAtual === 'filas' ? (
+        <FilaPublica />
+      ) : (
+        <>
+          <header className="busca-header">
+            <h2 className="busca-titulo">Acompanhamento de Solicitações do Cidadão</h2>
+            <p className="busca-subtitulo">Digite seu CPF abaixo e se informe sobre a situação atualizada dos seus agendamentos, exames e consultas.
+            </p>
+          </header>
+
       <div className="search-container">
             <form onSubmit={buscarDados} className="search-form">
             <div className="inputs-wrapper">
@@ -637,7 +721,12 @@ function App() {
                   className="search-input cpf-input"
                 />
                 <div className="captcha-wrapper">
-                  <div className="captcha-box" title="Código de verificação">{captchaGerado}</div>
+                  <div 
+                    className="captcha-box" 
+                    title="Código de verificação"
+                  >
+                    {captchaGerado}
+                  </div>
                   <button type="button" className="captcha-refresh-btn" onClick={gerarCaptcha} title="Trocar código">↻</button>
                   <input 
                     type="text" 
@@ -752,6 +841,17 @@ function App() {
           <div className="filters-container">
             <div className="filters-row">
               <div className="filter-group">
+                
+                <select 
+                  className={`filter-select ${filtroTipo !== 'TODOS' ? 'active-filter' : ''}`} 
+                  value={filtroTipo} 
+                  onChange={(e) => setFiltroTipo(e.target.value)}
+                >
+                  <option value="TODOS">Todos os Tipos</option>
+                  <option value="AMBULATORIAL">Ambulatorial</option>
+                  <option value="HOSPITALAR">Hospitalar</option>
+                </select>
+
                 <select 
                   className={`filter-select ${filtroAno !== 'TODOS' ? 'active-filter' : ''}`} 
                   value={filtroAno} 
@@ -769,9 +869,14 @@ function App() {
                   <option value="TODOS">Todas as Situações</option>
                   {LISTA_SITUACOES.map(s => (<option key={s} value={s}>{s}</option>))}
                 </select>
+
               </div>
               
-              <select className="sort-select" value={ordem} onChange={(e) => setOrdem(e.target.value)}>
+              <select 
+                className="sort-select" 
+                value={ordem} 
+                onChange={(e) => setOrdem(e.target.value)}
+              >
                 <option value="PROCEDIMENTO">Procedimento (A-Z)</option>
                 <option value="DATA_DESC">Data da Solicitação (Mais Recente)</option>
                 <option value="DATA_ASC">Data da Solicitação (Mais Antiga)</option>
@@ -784,7 +889,7 @@ function App() {
 
             <div className="legends-wrapper">
               <div className="legend-section">
-                <span className="legend-title">Legenda de Situação</span>
+                <span className="legend-title">Legenda de Situação:</span>
                 <div className="legend-grid">
                   <div className="legend-item"><div className="legend-header"><span className="legend-dot ind-alerta"></span><span className="emoji-fix">🟡</span> PENDENTE</div></div>
                   <div className="legend-item"><div className="legend-header"><span className="legend-dot ind-sucesso"></span><span className="emoji-fix">🟢</span> CONFIRMADO / AUTORIZADO</div></div>
@@ -798,12 +903,31 @@ function App() {
           </div>
 
           <div className="results-container">
-            {itensAtuais.map((item, index) => {
+
+            {listaExibida.length === 0 ? (
+              <div className="empty-state-box">
+                <h3 className="empty-state-titulo">
+                  Nenhum registro encontrado...
+                </h3>
+                <p className="empty-state-texto">
+                  O paciente não possui agendamentos
+                  {filtroSituacao !== 'TODOS' && <span> com o status <strong> "{filtroSituacao.replace(/^[^\w\s]+/, '').trim()}"</strong></span>}
+                  {filtroAno !== 'TODOS' && <strong> no ano de {filtroAno}</strong>}.
+                </p>
+                
+                <button 
+                  onClick={() => { setFiltroSituacao('TODOS'); setFiltroAno('TODOS'); setFiltroTipo('TODOS'); }}
+                  className="btn-limpar-filtros"
+                >Limpar Filtros</button>
+              </div>
+            ) : (
+
+            itensAtuais.map((item, index) => {
               const source = item._source || {};
               
               const nomeProcedimento = getNomeProcedimento(source);
               const solicitante = source.nome_unidade_solicitante || 'Não informado';
-              const statusTraduzido = traduzirStatus(source.status_solicitacao);
+              const statusTraduzido = traduzirStatus(source.status_solicitacao, source.tipo_registro);
               const situacaoInfo = getSituacaoInfo(statusTraduzido);
               
               const textoBruto = extrairTextoLaudo(source.laudo) || source.justificativa_impedimento || "";
@@ -821,50 +945,71 @@ function App() {
               const bordaTema = ehAgendamentoFuturo ? '#b6d4fe' : '#bcf0da';
               const corTextoDetalhes = ehAgendamentoFuturo ? corTema : '#666666';
               const codSolicitacao = source.codigo_solicitacao || "Não informado"; 
-              
-              const getCoresEtiqueta = (classe) => {
-                switch(classe) {
-                  case 'sucesso': return { bg: '#f0fdf4', border: '#bcf0da', text: '#15803d' };
-                  case 'alerta': return { bg: '#fefce8', border: '#fef08a', text: '#a16207' };
-                  case 'perigo': return { bg: '#fef2f2', border: '#fecaca', text: '#b91c1c' };
-                  case 'laranja': return { bg: '#fff7ed', border: '#fed7aa', text: '#c2410c' };
-                  case 'rosa': return { bg: '#fdf2f8', border: '#fbcfe8', text: '#be185d' };
-                  case 'futuro': return { bg: '#eff6ff', border: '#bfdbfe', text: '#1d4ed8' };
-                  default: return { bg: '#f8fafc', border: '#e2e8f0', text: '#334155' };
-                }
-              };
+              const isHospitalar = source.tipo_registro === "HOSPITALAR";
               const coresEtiqueta = getCoresEtiqueta(classeCard);
 
               return (
-                <div key={index} className={`result-card tipo-${classeCard}`}>
+                <div key={source.codigo_solicitacao || index} className={`result-card tipo-${classeCard}`}>
                   
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '15px', marginBottom: '12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '15px', marginBottom: '25px' }}>
                     
-                    <h3 className="card-title" style={{ margin: 0 }}>{nomeProcedimento}</h3>
-                    
-                    <div style={{
-                      backgroundColor: coresEtiqueta.bg,
-                      color: coresEtiqueta.text,
-                      border: `1px solid ${coresEtiqueta.border}`,
-                      padding: '6px 12px',
-                      borderRadius: '6px',
-                      fontSize: '14px',
-                      fontWeight: '700',
-                      textAlign: 'center',
-                      flexShrink: 0
-                    }}>
-                      <span style={{ display: 'block', fontSize: '10px', fontWeight: 'bold', opacity: 0.8, marginBottom: '2px', textTransform: 'uppercase' }}>
-                        Cód. Solicitação
-                      </span>
-                      {codSolicitacao}
+                    <div>
+                      <h3 className="card-title" style={{ margin: 0 }}>{nomeProcedimento}</h3>
                     </div>
 
+                    <div style={{ height: '0px', overflow: 'visible', flexShrink: 0 }}>
+
+                      <div style={{ position: 'relative',display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-end', flexShrink: 0 }}>
+                      
+                        <div style={{
+                          backgroundColor: coresEtiqueta.bg,
+                          color: coresEtiqueta.text,
+                          border: `1px solid ${coresEtiqueta.border}`,
+                          padding: '6px 12px',
+                          borderRadius: '6px',
+                          fontSize: '14px',
+                          fontWeight: '700',
+                          textAlign: 'center',
+                          width: '100%'
+                        }}>
+                          <span style={{ display: 'block', fontSize: '10px', fontWeight: 'bold', opacity: 0.8, marginBottom: '2px', textTransform: 'uppercase' }}>
+                            Cód. Solicitação
+                          </span>
+                          {codSolicitacao}
+                        </div>
+
+                        {isHospitalar && (
+                          <div style={{
+                            backgroundColor: coresEtiqueta.bg,
+                            color: coresEtiqueta.text,
+                            border: `1px solid ${coresEtiqueta.border}`,
+                            padding: '4px 12px',
+                            borderRadius: '6px',
+                            fontSize: '11px',
+                            fontWeight: '800',
+                            textAlign: 'center',
+                            textTransform: 'uppercase',
+                            width: '100%',
+                            boxSizing: 'border-box'
+                          }}>
+                            <strong>HOSPITALAR</strong>
+                          </div>
+                        )}
+
+                      </div>
+                    </div>
                   </div>
 
                   <div className="card-details">
                     <div className="info-row">
                       <strong>DATA DA SOLICITAÇÃO:</strong> {formatarData(source.data_solicitacao)}
                     </div>
+
+                    {isHospitalar && source.data_reserva && (
+                      <div className="info-row" style={{ color: '#9b59b6', fontWeight: 'bold' }}>
+                        <strong>DATA DA CIRURGIA:</strong> {formatarData(source.data_reserva)}
+                      </div>
+                    )}
                     
                     <div className="info-row">
                       <strong>UNIDADE SOLICITANTE:</strong> {solicitante}
@@ -918,16 +1063,17 @@ function App() {
                     )}
 
                     {situacaoInfo.classe === 'perigo' && motivoCancelamento && (
-                      <div className="destaque-motivo" style={{ backgroundColor: '#fdf0f0', border: '1px solid #fababa', borderRadius: '6px', padding: '12px', marginTop: '12px' }}>
-                        <strong style={{ color: '#e74c3c', display: 'block', marginBottom: '4px' }}>MOTIVO DO CANCELAMENTO OU NEGATIVA:</strong>
-                        <span style={{ fontSize: '0.95rem', color: '#333', lineHeight: '1.4' }}>{motivoCancelamento}</span>
+                      <div className="box-motivo-cancelamento">
+                        <strong className="titulo-cancelamento">MOTIVO DO CANCELAMENTO OU NEGATIVA:</strong>
+                        <span className="texto-cancelamento">{motivoCancelamento}</span>
                      </div>
                     )}
                     
                   </div>
                 </div>
               );
-            })}
+            })
+          )}
             
             {listaExibida.length > ITENS_POR_PAGINA && (
               <div className="pagination-container">
@@ -939,6 +1085,9 @@ function App() {
           </div>
         </>
       )}
+      </>
+      )}
+
     </div>
   )
 }
