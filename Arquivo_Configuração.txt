@@ -1,0 +1,45 @@
+; ===================================================================
+; FICHEIRO DE CONFIGURAÇÃO - MAPEAMENTO DE TELESSAÚDE (SISREG)
+; ===================================================================
+; Podes comentar linhas usando o ponto e vírgula.
+; As especialidades devem ser escritas exatamente como estão no painel.
+
+[Hospital Central Universitário]
+Cardiologia = sim
+Oftalmologia = sim
+Ortopedia = nao
+Pediatria = sim
+Ginecologia = nao
+Neurologia = sim
+Dermatologia = nao
+Endocrinologia = nao
+
+[UPA Zona Norte]
+Cardiologia = nao
+Oftalmologia = nao
+Ortopedia = sim
+Pediatria = sim
+Ginecologia = sim
+Neurologia = nao
+Dermatologia = nao
+Endocrinologia = nao
+
+[Posto de Saúde Central]
+Cardiologia = sim
+Oftalmologia = nao
+Ortopedia = nao
+Pediatria = nao
+Ginecologia = nao
+Neurologia = nao
+Dermatologia = sim
+Endocrinologia = sim
+
+[Clínica de Especialidades Municipal]
+Cardiologia = sim
+Oftalmologia = sim
+Ortopedia = sim
+Pediatria = nao
+Ginecologia = sim
+Neurologia = sim
+Dermatologia = sim
+Endocrinologia = sim
