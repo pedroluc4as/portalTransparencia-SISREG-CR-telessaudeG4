@@ -1,7 +1,8 @@
-import { useState, useMemo, useEffect } from 'react'
-import axios from 'axios'
-import './App.css'
-import logoPrefeitura from './assets/logo-prefeitura.png'
+import React, { useState, useEffect, useMemo } from 'react';
+import axios from 'axios';
+import './App.css';
+import logoPrefeitura from './assets/logo-prefeitura.png';
+import AdminTelessaude from './components/AdminTelessaude';
 
 const ITENS_POR_PAGINA = 5;
 
@@ -371,6 +372,7 @@ const getNomeProcedimento = (src) => {
 };
 
 function App() {
+  const [mostrarAdmin, setMostrarAdmin] = useState(false);
   const [cpf, setCpf] = useState('')
   const [pedidos, setPedidos] = useState([])
   const [loading, setLoading] = useState(false)
@@ -608,8 +610,32 @@ function App() {
 
   const primeiroPedido = pedidos.length > 0 ? pedidos[0]._source : null;
 
+  if (mostrarAdmin) {
+    return (
+      <div style={{ position: 'relative' }}>
+        <button 
+          onClick={() => setMostrarAdmin(false)} 
+          style={{ position: 'absolute', top: '25px', left: '20px', zIndex: 9999, backgroundColor: '#0E3D64', color: '#fff', padding: '10px 15px', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
+        >
+          ⬅ Voltar ao Site Original
+        </button>
+        <AdminTelessaude />
+      </div>
+    );
+  }
+
   return (
-    <div className="app-container">
+    <div className="app-container" style={{ position: 'relative' }}>
+      
+      {/* --- INÍCIO DO NOVO BOTÃO --- */}
+      <button 
+        onClick={() => setMostrarAdmin(true)}
+        style={{ position: 'absolute', top: '15px', right: '15px', zIndex: 9999, backgroundColor: '#E55C24', color: '#fff', padding: '10px 15px', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 2px 5px rgba(0,0,0,0.2)' }}
+      >
+        ⚙️ Ir para Painel Admin
+      </button>
+      {/* --- FIM DO NOVO BOTÃO --- */}
+
       <header className="app-header">
         <img src={logoPrefeitura} alt="Prefeitura" className="header-logo" />
         <h1 className="app-title">PORTAL DA TRANSPARÊNCIA<br />CENTRAL DE REGULAÇÃO</h1>
@@ -617,7 +643,7 @@ function App() {
           Digite seu CPF abaixo e se informe sobre a situação atualizada dos seus agendamentos, exames e consultas.
         </p>
       </header>
-      
+
       <div className="search-container">
             <form onSubmit={buscarDados} className="search-form">
             <div className="inputs-wrapper">
