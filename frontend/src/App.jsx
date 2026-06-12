@@ -3,6 +3,7 @@ import axios from 'axios'
 import './App.css'
 import logoPrefeitura from './assets/logo-prefeitura.png'
 import FilaPublica from './components/FilaPublica.jsx'
+import Faltometro from './components/Faltometro.jsx'
 
 const ITENS_POR_PAGINA = 5;
 
@@ -666,6 +667,7 @@ function App() {
         <h1 className="app-title">PORTAL DA TRANSPARÊNCIA<br />CENTRAL DE REGULAÇÃO</h1>
 
         <div className="nav-abas-container">
+          
           <button 
             type="button" 
             className={`aba-nav ${visaoAtual === 'consulta' ? 'aba-ativa' : ''}`} 
@@ -689,11 +691,26 @@ function App() {
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
             Painel de Filas
           </button>
+
+          <button 
+            type="button" 
+            className={`aba-nav ${visaoAtual === 'faltometro' ? 'aba-ativa' : ''}`} 
+            onClick={() => { 
+              setVisaoAtual('faltometro');
+              cancelarConfirmacao();
+            }}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>
+            Faltômetro Municipal
+          </button>
+
         </div>
       </header>
 
       {visaoAtual === 'filas' ? (
         <FilaPublica />
+      ) : visaoAtual === 'faltometro' ? (
+        <Faltometro />
       ) : (
         <>
           <header className="busca-header">

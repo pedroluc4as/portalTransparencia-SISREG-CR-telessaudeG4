@@ -673,3 +673,265 @@ h1, h2, h3, h4, h5, h6, strong, b,
 .empty-state-box { text-align: center; padding: 30px 20px; background-color: var(--gov-bg); border-radius: 8px; border: 2px dashed var(--gray-heavy); color: var(--text-main); margin-top: 0; }
 .empty-state-titulo { margin: 0 0 10px 0; color: var(--text-muted); font-size: 1.2rem; }
 .empty-state-texto { margin: 0; }
+
+.titulo-vermelho { color: var(--gov-red) !important; }
+.texto-vermelho { color: var(--gov-red); }
+.erro-centralizado { text-align: center; margin: 40px auto; max-width: 600px; }
+.erro-dica { font-size: 0.9rem; margin-top: 10px; font-weight: normal; }
+
+.texto-vermelho { color: var(--gov-red); }
+.erro-centralizado { text-align: center; margin: 40px auto; max-width: 600px; }
+.erro-dica { font-size: 0.9rem; margin-top: 10px; color: var(--text-muted); font-family: 'AktivGrotesk-Regular', sans-serif; }
+
+.titulo-com-icone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  font-family: 'AktivGrotesk-XBold', sans-serif;
+  color: var(--gov-blue);
+}
+
+.icone-alerta {
+  width: 34px; 
+  height: 34px;
+  color: var(--gov-red); 
+  flex-shrink: 0; 
+}
+
+.bloco-unificado-faltometro {
+  background: var(--white);
+  padding: 25px;
+  border-radius: 15px; 
+  box-shadow: 0 5px 20px var(--alpha-light);
+  border-top: 5px solid var(--gov-blue); 
+  margin-bottom: 40px;
+  max-width: 800px;
+  margin-left: auto;
+  margin-right: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 25px;
+}
+
+.filtro-linha {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 15px;
+  padding-bottom: 20px;
+  border-bottom: 1px dashed var(--gray-border);
+}
+
+.select-faltometro {
+  width: 220px;
+  padding: 8px 10px; 
+  border-radius: 6px; 
+  border: 1px solid var(--gray-heavy); 
+  color: var(--text-main); 
+  background-color: var(--white);
+  font-family: 'AktivGrotesk-Regular', sans-serif;
+  font-size: 0.85rem; 
+  font-weight: normal; 
+  cursor: pointer; 
+  outline: none; 
+  box-shadow: none;
+  transition: all 0.2s; 
+  white-space: nowrap; 
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+.select-faltometro:hover {
+  border-color: #b3b3b3; 
+  outline: none; 
+  box-shadow: none; 
+}
+
+.select-faltometro:focus {
+  border-color: var(--gov-red); 
+  color: var(--gov-red); 
+  box-shadow: 0 0 0 2px var(--alpha-glow-red); 
+  font-weight: 600; 
+}
+
+.estatisticas-linha {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  background-color: #fafafa;
+  padding: 25px 15px; 
+  border-radius: 8px; 
+}
+
+.estatistica-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  flex: 1;
+}
+
+.divisor-vertical {
+  width: 1px;
+  height: 70px;
+  background-color: var(--gray-border);
+}
+
+.estatistica-titulo {
+  font-family: 'AktivGrotesk-XBold', sans-serif;
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  margin-bottom: 5px;
+  color: var(--text-muted);
+}
+
+.estatistica-numero {
+  font-family: 'AktivGrotesk-XBold', sans-serif;
+  font-size: 4rem; 
+  line-height: 1;
+}
+
+.estatistica-item.azul .estatistica-numero {
+  color: var(--gov-blue);
+}
+
+.estatistica-item.vermelho .estatistica-numero {
+  color: var(--gov-red);
+}
+
+.subtitulo-secao {
+  font-family: 'AktivGrotesk-XBold', sans-serif;
+  font-size: 1.3rem;
+  color: var(--gov-blue);
+  border-bottom: 2px solid var(--gray-border);
+  padding-bottom: 10px;
+  margin-top: 20px;
+  margin-bottom: 25px;
+  text-transform: uppercase;
+}
+
+.lista-faltas {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.card-falta {
+  background: var(--white);
+  border-radius: 8px;
+  padding: 20px;
+  border: 1px solid var(--gray-border);
+  border-left: 5px solid var(--gov-blue);
+  box-shadow: 0 2px 6px var(--alpha-light);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.card-falta:hover {
+  transform: translateX(4px);
+  box-shadow: 0 4px 12px var(--alpha-light);
+}
+
+.falta-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.falta-nome {
+  font-family: 'AktivGrotesk-XBold', sans-serif;
+  color: var(--gov-blue);
+  font-size: 1.1rem;
+  text-transform: uppercase;
+}
+
+.falta-qtd {
+  font-family: 'AktivGrotesk-XBold', sans-serif;
+  font-size: 1.15rem;
+  color: var(--gov-red); 
+}
+
+.barra-fundo {
+  width: 100%;
+  height: 12px;
+  background-color: var(--gray-border);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.barra-progresso {
+  height: 100%;
+  border-radius: 10px;
+  background-color: var(--gov-red); 
+  transition: width 1.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.falta-detalhe {
+  text-align: right;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-family: 'AktivGrotesk-Regular', sans-serif;
+  font-weight: 600;
+}
+
+.data-atualizacao {
+  text-align: center;
+  margin-top: 40px;
+  color: var(--text-muted);
+  font-family: 'AktivGrotesk-XBold', sans-serif;
+  font-size: 0.9rem;
+}
+
+@media (max-width: 768px) {
+  .bloco-unificado-faltometro {
+    padding: 20px 15px;
+    border-radius: 12px;
+  }
+  .filtro-linha {
+    flex-direction: column;
+    gap: 10px;
+    padding-bottom: 15px;
+  }
+  .estatisticas-linha {
+    flex-direction: column;
+    gap: 20px;
+  }
+  .divisor-vertical {
+    width: 80%;
+    height: 1px;
+  }
+  .falta-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+  }
+  .falta-qtd {
+    align-self: flex-end;
+  }
+}
+
+.card-fila-skeleton {
+  height: 160px;
+  display: flex;
+  flex-direction: column;
+}
+
+.skeleton-bottom-fila {
+  margin-top: auto;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.skeleton-numero {
+  width: 50px;
+  height: 40px;
+  margin: 0 !important;
+}
+
+.skeleton-texto-curto {
+  width: 80px;
+  margin: 0 !important;
+}

@@ -8,6 +8,7 @@ import httpx
 import asyncio
 import re
 from apscheduler.schedulers.background import BackgroundScheduler
+import calendar
 
 load_dotenv()
 
@@ -15,12 +16,10 @@ USUARIO = os.getenv("SISREG_USUARIO")
 SENHA = os.getenv("SISREG_SENHA")
 
 CACHE_FILAS = {"dados_fila": [], "ultima_atualizacao": None}
+CACHE_FALTOMETRO = {"historico_meses": {}, "ultima_atualizacao": None}
 
 app = FastAPI()
 
-# ATENÇÃO EQUIPE DE TI DA PREFEITURA: 
-# Quando forem subir pra internet, troquem o ["*"] pelo domínio oficial.
-# Exemplo: allow_origins=["https://transparencia.treslagoas.ms.gov.br"]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"], 
@@ -260,10 +259,7 @@ async def consultar_cpf(cpf_usuario: str, nome_mae: str = Query(None)):
         if isinstance(e, HTTPException):
             raise e
         return []
-
-# VERSION 2.0
-
-# 1. Fila de espera por procedimento    
+ 
 async def atualizar_cache_filas():
     global CACHE_FILAS
     try:
@@ -342,9 +338,130 @@ async def atualizar_cache_filas():
 async def obter_filas_espera():
     return CACHE_FILAS
 
+async def atualizar_cache_faltometro():
+    global CACHE_FALTOMETRO
+    try:
+        print("[CRON] Iniciando extração dos últimos 6 meses para o Faltômetro...", flush=True)
+
+        hoje = datetime.now()
+        dados_por_mes = {}
+
+        for i in range(5, -1, -1): 
+            mes_alvo = hoje.month - i
+            ano_alvo = hoje.year
+            
+            if mes_alvo <= 0:
+                mes_alvo += 12
+                ano_alvo -= 1
+                
+            primeiro_dia = f"{ano_alvo}-{mes_alvo:02d}-01"
+            ultimo_dia_mes = calendar.monthrange(ano_alvo, mes_alvo)[1]
+            ultimo_dia = f"{ano_alvo}-{mes_alvo:02d}-{ultimo_dia_mes}"
+            
+            chave_mes = f"{mes_alvo:02d}/{ano_alvo}"
+
+            dados_por_mes[chave_mes] = {
+                "total_agendamentos": 0,
+                "total_faltas_geral": 0,
+                "especialidades": {}
+            }
+
+            payload = {
+                "size": 10000, 
+                "_source": ["nome_grupo_procedimento", "status_solicitacao"],
+                "query": {
+                    "bool": {
+                        "must": [
+                            { "term": { "codigo_central_reguladora": "500830" } },
+                            {
+                                "range": {
+                                    "data_marcacao": {
+                                        "gte": f"{primeiro_dia}T00:00:00",
+                                        "lte": f"{ultimo_dia}T23:59:59"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+
+            async with httpx.AsyncClient(timeout=30.0, verify=False) as client:
+                resp = await client.post(
+                    f"{URL_MARCACOES_SISREG}/_search", 
+                    json=payload, 
+                    headers={"Content-Type": "application/json"}, 
+                    auth=(USUARIO, SENHA)
+                )
+                dados_json = resp.json()
+            
+            registros = dados_json.get("hits", {}).get("hits", [])
+            
+            for hit in registros:
+                source = hit.get("_source", {})
+                status = str(source.get("status_solicitacao", "")).upper()
+                especialidade = str(source.get("nome_grupo_procedimento", "NÃO INFORMADA")).strip().upper()
+                
+                if "PENDENTE" in status or "CANCELADA" in status or "DEVOLVIDA" in status or especialidade == "NONE":
+                    continue
+
+                especialidade = especialidade.replace("GRUPO - ", "").strip()
+                mes_ref = dados_por_mes[chave_mes]
+                
+                mes_ref["total_agendamentos"] += 1
+                
+                if especialidade not in mes_ref["especialidades"]:
+                    mes_ref["especialidades"][especialidade] = {"agendados": 0, "faltas": 0}
+                    
+                mes_ref["especialidades"][especialidade]["agendados"] += 1
+
+                if "AGENDAMENTO / FALTA / EXECUTANTE" in status:
+                    mes_ref["total_faltas_geral"] += 1
+                    mes_ref["especialidades"][especialidade]["faltas"] += 1
+
+        cache_final = {}
+        for mes, info in dados_por_mes.items():
+            lista_especialidades = []
+            
+            for esp, nums in info["especialidades"].items():
+                if nums["faltas"] > 0: 
+                    taxa = (nums["faltas"] / nums["agendados"]) * 100
+                    lista_especialidades.append({
+                        "especialidade": esp,
+                        "agendados": nums["agendados"],
+                        "faltas": nums["faltas"],
+                        "taxa_evasao": round(taxa, 1)
+                    })
+
+            lista_especialidades.sort(key=lambda x: x["faltas"], reverse=True)
+
+            if info["total_agendamentos"] > 0:
+                cache_final[mes] = {
+                    "resumo": {
+                        "total_avaliado": info["total_agendamentos"],
+                        "ausencias_totais": info["total_faltas_geral"]
+                    },
+                    "dados_faltas": lista_especialidades
+                }
+
+        CACHE_FALTOMETRO["historico_meses"] = cache_final
+        CACHE_FALTOMETRO["ultima_atualizacao"] = datetime.now().strftime("%d/%m/%Y às %H:%M")
+        
+        print(f"[CRON] Faltômetro atualizado! Meses processados: {list(cache_final.keys())}", flush=True)
+
+    except Exception as e:
+        print(f"[CRON ERRO] Falha ao processar Faltômetro: {e}", flush=True)
+
+@app.get("/api/faltometro")
+async def obter_faltometro():
+    return CACHE_FALTOMETRO
+
 @app.on_event("startup")
 async def iniciar_agendador():
     scheduler = BackgroundScheduler()
     scheduler.add_job(lambda: asyncio.run(atualizar_cache_filas()), 'cron', hour=4, minute=0)
+    scheduler.add_job(lambda: asyncio.run(atualizar_cache_faltometro()), 'cron', hour=4, minute=15)
     scheduler.start()
+    
     asyncio.create_task(atualizar_cache_filas())
+    asyncio.create_task(atualizar_cache_faltometro())
