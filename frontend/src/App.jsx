@@ -914,6 +914,8 @@ function App() {
                   <div className="legend-item"><div className="legend-header"><span className="legend-dot ind-laranja"></span><span className="emoji-fix">🔁</span> DEVOLVIDO / REENVIADO</div></div>
                   <div className="legend-item"><div className="legend-header"><span className="legend-dot ind-rosa"></span><span className="emoji-fix">⚠️</span> FALTA / AUSÊNCIA</div></div>
                   <div className="legend-item"><div className="legend-header"><span className="legend-dot ind-info"></span><span className="emoji-fix">🔵</span> AGENDAMENTO FUTURO</div></div>
+                  {/*telessaude*/}
+                  <div className="legend-item"><div className="legend-header"><span className="legend-dot" style={{backgroundColor: '#8b5cf6'}}></span><span className="emoji-fix">💻</span> TELESSAÚDE</div></div>
                 </div>
               </div>
             </div>
@@ -1032,13 +1034,42 @@ function App() {
                       <strong>UNIDADE SOLICITANTE:</strong> {solicitante}
                     </div>
                     
+                    <div className="status-full" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center' }}>
+                        <span className="emoji-grande emoji-fix">{emojiCard}</span>
+                        <span className="status-texto" style={ehAgendamentoFuturo ? { color: '#3498db', fontWeight: 'bold' } : {}}>
+                          {textoStatusCard}
+                        </span>
+                      </div>
+                      
+                      {/*tag de telessaude*/}
+                      {source.is_telessaude && (
+                        <span style={{
+                          backgroundColor: '#f3e8ff',
+                          color: '#7e22ce',
+                          padding: '6px 12px',
+                          borderRadius: '16px',
+                          fontSize: '12px',
+                          fontWeight: 'bold',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          border: '1px solid #d8b4fe',
+                          marginLeft: 'auto'
+                        }}>
+                          💻 CONSULTA VIA TELESSAÚDE
+                        </span>
+                      )}
+                    </div>
+
+                    {/*
                     <div className="status-full">
                       <span className="emoji-grande emoji-fix">{emojiCard}</span>
                       <span className="status-texto" style={ehAgendamentoFuturo ? { color: '#3498db', fontWeight: 'bold' } : {}}>
                         {textoStatusCard}
                       </span>
                     </div>
-
+                    */}
                     {(situacaoInfo.classe === 'sucesso' || classeCard === 'futuro') && (
                        <div className="destaque-contato" style={{ backgroundColor: bgTema, border: `1px solid ${bordaTema}`, borderRadius: '6px', padding: '12px', marginTop: '12px' }}>
                           
