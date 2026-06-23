@@ -235,6 +235,28 @@ async def consultar_cpf(cpf_usuario: str, nome_mae: str = Query(None)):
 
         for item in dados_finais:
             source = item.get("_source", {})
+            # ==============================
+            # INÍCIO DO FILTRO DE TELESSAÚDE
+            # ==============================
+            unidade_exec = str(source.get("nome_unidade_executante", "")).strip().lower()
+            proced = str(source.get("descricao_interna_procedimento", "")).strip().lower()
+            
+            is_tele = False
+            
+            if "centro de especialidades" in unidade_exec or "cem" in unidade_exec:
+                if "neurologia" in proced or "endocrinologia" in proced:
+                    is_tele = True
+            elif "saúde mental" in unidade_exec or "saude mental" in unidade_exec or "ambulat" in unidade_exec:
+                if "psicologia" in proced or "psiquiatria" in proced:
+                    is_tele = True
+            elif "criança" in unidade_exec or "crianca" in unidade_exec:
+                if "neuropediatria" in proced:
+                    is_tele = True
+
+            item["_source"]["is_telessaude"] = is_tele
+            # ============================
+            # FIM DO FILTRO DE TELESSAÚDE
+            # ============================
             data_ref = source.get("data_solicitacao") or source.get("data_marcacao") or source.get("data_atualizacao")
             
             ano_str = str(data_ref)[:4] if data_ref else ""
