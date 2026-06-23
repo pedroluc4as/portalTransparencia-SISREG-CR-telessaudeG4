@@ -1,3 +1,6 @@
+import json
+from pydantic import BaseModel
+from typing import Dict, Any
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
@@ -18,6 +21,13 @@ SENHA = os.getenv("SISREG_SENHA")
 CACHE_FILAS = {"dados_fila": [], "ultima_atualizacao": None}
 CACHE_FALTOMETRO = {"historico_meses": {}, "ultima_atualizacao": None}
 
+ARQUIVO_CONFIG_TELES = "telessaude_db.json"
+CACHE_CONFIG_TELESSAUDE = {"configTexto": "", "configJson": {}}
+
+class ConfigTelessaudeModel(BaseModel):
+    configTexto: str
+    configJson: Dict[str, Any]
+
 app = FastAPI()
 
 app.add_middleware(
@@ -31,6 +41,37 @@ app.add_middleware(
 URL_SOLICITACOES_SISREG = "https://sisreg-es.saude.gov.br/solicitacao-ambulatorial-ms-tres-lagoas"
 URL_MARCACOES_SISREG = "https://sisreg-es.saude.gov.br/marcacao-ambulatorial-ms-tres-lagoas"
 URL_HOSPITALAR_SISREG = "https://sisreg-es.saude.gov.br/solicitacao-hospitalar-ms-tres-lagoas"
+
+# =========================================================
+# ROTAS DO PAINEL ADMIN DE TELESSAÚDE
+# =========================================================
+def carregar_config_telessaude():
+    global CACHE_CONFIG_TELESSAUDE
+    if os.path.exists(ARQUIVO_CONFIG_TELES):
+        try:
+            with open(ARQUIVO_CONFIG_TELES, "r", encoding="utf-8") as f:
+                CACHE_CONFIG_TELESSAUDE = json.load(f)
+        except Exception as e:
+            print(f"[ERRO] Falha ao carregar configuração de telessaude: {e}")
+
+@app.get("/api/config-telessaude")
+async def get_config_telessaude():
+    return CACHE_CONFIG_TELESSAUDE
+
+@app.post("/api/atualizar-telessaude")
+async def atualizar_config_telessaude(payload: ConfigTelessaudeModel):
+    global CACHE_CONFIG_TELESSAUDE
+    CACHE_CONFIG_TELESSAUDE = {
+        "configTexto": payload.configTexto, 
+        "configJson": payload.configJson
+    }
+    try:
+        with open(ARQUIVO_CONFIG_TELES, "w", encoding="utf-8") as f:
+            json.dump(CACHE_CONFIG_TELESSAUDE, f, ensure_ascii=False, indent=4)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Erro ao salvar o arquivo de configuração.")
+    return {"mensagem": "Configuração salva e aplicada com sucesso no servidor!"}
+# =========================================================
 
 def normalizar_texto(texto: str):
     if not texto: return ""
@@ -235,28 +276,36 @@ async def consultar_cpf(cpf_usuario: str, nome_mae: str = Query(None)):
 
         for item in dados_finais:
             source = item.get("_source", {})
-            # ==============================
-            # INÍCIO DO FILTRO DE TELESSAÚDE
-            # ==============================
-            unidade_exec = str(source.get("nome_unidade_executante", "")).strip().lower()
-            proced = str(source.get("descricao_interna_procedimento", "")).strip().lower()
+           # =========================================================
+            # INÍCIO DO FILTRO DE TELESSAÚDE (DINÂMICO)
+            # =========================================================
+            unidade_exec = normalizar_texto(source.get("nome_unidade_executante", ""))
+            proced = normalizar_texto(source.get("descricao_interna_procedimento", ""))
             
             is_tele = False
+            config_json = CACHE_CONFIG_TELESSAUDE.get("configJson", {})
             
-            if "centro de especialidades" in unidade_exec or "cem" in unidade_exec:
-                if "neurologia" in proced or "endocrinologia" in proced:
-                    is_tele = True
-            elif "saúde mental" in unidade_exec or "saude mental" in unidade_exec or "ambulat" in unidade_exec:
-                if "psicologia" in proced or "psiquiatria" in proced:
-                    is_tele = True
-            elif "criança" in unidade_exec or "crianca" in unidade_exec:
-                if "neuropediatria" in proced:
-                    is_tele = True
+            # Percorre o objeto JSON vindo do React (Unidade -> Especialidades)
+            for unidade_cfg, especialidades in config_json.items():
+                unidade_cfg_norm = normalizar_texto(unidade_cfg)
+                
+                # Se o nome da unidade bater com a configuração
+                if unidade_cfg_norm in unidade_exec or unidade_exec in unidade_cfg_norm:
+                    
+                    # Percorre as especialidades e verifica se estão ativadas (True)
+                    for esp_cfg, ativo in especialidades.items():
+                        if ativo: 
+                            esp_cfg_norm = normalizar_texto(esp_cfg)
+                            if esp_cfg_norm in proced:
+                                is_tele = True
+                                break
+                if is_tele:
+                    break
 
             item["_source"]["is_telessaude"] = is_tele
-            # ============================
+            # =========================================================
             # FIM DO FILTRO DE TELESSAÚDE
-            # ============================
+            # =========================================================
             data_ref = source.get("data_solicitacao") or source.get("data_marcacao") or source.get("data_atualizacao")
             
             ano_str = str(data_ref)[:4] if data_ref else ""
@@ -480,6 +529,9 @@ async def obter_faltometro():
 
 @app.on_event("startup")
 async def iniciar_agendador():
+    #carrega o arquivo json que ficou salvo (se houver queda do servidor ou deploy por parte da prefeitura)
+    carregar_config_telessaude()
+
     scheduler = BackgroundScheduler()
     scheduler.add_job(lambda: asyncio.run(atualizar_cache_filas()), 'cron', hour=4, minute=0)
     scheduler.add_job(lambda: asyncio.run(atualizar_cache_faltometro()), 'cron', hour=4, minute=15)
