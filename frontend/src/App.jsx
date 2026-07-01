@@ -1,14 +1,10 @@
-import { useState, useMemo, useEffect } from 'react'
-import axios from 'axios'
-import './App.css'
-import logoPrefeitura from './assets/logo-prefeitura.png'
-import FilaPublica from './components/FilaPublica.jsx'
-import Faltometro from './components/Faltometro.jsx'
 import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import './App.css';
 import logoPrefeitura from './assets/logo-prefeitura.png';
-import AdminTelessaude from './components/AdminTelessaude';
+import FilaPublica from './components/FilaPublica.jsx';
+import Faltometro from './components/Faltometro.jsx';
+import AdminTelessaude from './components/AdminTelessaude.jsx';
 
 const ITENS_POR_PAGINA = 5;
 
@@ -1062,14 +1058,7 @@ function App() {
                       <strong>UNIDADE SOLICITANTE:</strong> {solicitante}
                     </div>
                     
-                    <div className="status-full" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center' }}>
-                        <span className="emoji-grande emoji-fix">{emojiCard}</span>
-                        <span className="status-texto" style={ehAgendamentoFuturo ? { color: '#3498db', fontWeight: 'bold' } : {}}>
-                          {textoStatusCard}
-                        </span>
-                      </div>
-                      
+                    {/* AQUI ESTÁ O STATUS CORRIGIDO SEM A DUPLICAÇÃO */}
                     <div className="status-full">
                       <span className="emoji-grande emoji-fix">{emojiCard}</span>
                       <span className="status-texto" style={ehAgendamentoFuturo ? { color: '#3498db', fontWeight: 'bold' } : {}}>
@@ -1144,7 +1133,7 @@ function App() {
       )}
 
     </div>
-  )
+  );
 }
 
-export default App
+export default App;

@@ -116,6 +116,34 @@ async def consultar_cpf(cpf_usuario: str, nome_mae: str = Query(None)):
 
     try:
         cpf_limpo = cpf_usuario.replace(".", "").replace("-", "").strip()
+
+        # =========================================================
+        # BLOCO DE DADOS MOCK (CPF DE TESTE)
+        # =========================================================
+        if cpf_limpo == "99988877766":
+            print("[TESTE] CPF de teste detectado. Retornando dados simulados.", flush=True)
+            return [
+                {
+                    "_source": {
+                        "codigo_solicitacao": "10203040",
+                        "cpf_usuario": "99988877766",
+                        "no_usuario": "PACIENTE DE TESTE DA SILVA",
+                        "no_mae_usuario": "MARIA DE TESTE",
+                        "dt_nascimento_usuario": "1990-05-15",
+                        "endereco_completo": "RUA DOS DESENVOLVEDORES, n° 404, CENTRO, TRES LAGOAS - MS",
+                        "telefone_unificado": "67999999999",
+                        "data_solicitacao": "2026-05-10T10:00:00.000Z",
+                        "data_marcacao": "2026-07-20T14:30:00.000Z",
+                        "nome_unidade_solicitante": "POSTO DE SAUDE CENTRAL",
+                        "nome_unidade_executante": "CENTRO DE ESPECIALIDADES MEDICAS",
+                        "descricao_interna_procedimento": "CONSULTA EM NEUROLOGIA",
+                        "status_solicitacao": "AGENDAMENTO / CONFIRMADO / EXECUTANTE",
+                        "tipo_registro": "AMBULATORIAL",
+                        "is_telessaude": True
+                    }
+                },
+            ]
+        # =========================================================
         
         payload = {
             "query": { "bool": { "must": [ {"term": {"cpf_usuario": cpf_limpo}} ] } },
