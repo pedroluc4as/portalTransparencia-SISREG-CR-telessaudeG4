@@ -125,23 +125,71 @@ async def consultar_cpf(cpf_usuario: str, nome_mae: str = Query(None)):
             return [
                 {
                     "_source": {
-                        "codigo_solicitacao": "10203040",
-                        "cpf_usuario": "99988877766",
-                        "no_usuario": "PACIENTE DE TESTE DA SILVA",
+                        "codigo_solicitacao": "TEL-001",
+                        "no_usuario": "PACIENTE TESTE COMPLETO",
                         "no_mae_usuario": "MARIA DE TESTE",
                         "dt_nascimento_usuario": "1990-05-15",
-                        "endereco_completo": "RUA DOS DESENVOLVEDORES, n° 404, CENTRO, TRES LAGOAS - MS",
+                        "endereco_completo": "RUA TESTE, 123",
                         "telefone_unificado": "67999999999",
-                        "data_solicitacao": "2026-05-10T10:00:00.000Z",
-                        "data_marcacao": "2026-07-20T14:30:00.000Z",
-                        "nome_unidade_solicitante": "POSTO DE SAUDE CENTRAL",
+                        "data_solicitacao": "2026-06-01T10:00:00Z",
                         "nome_unidade_executante": "CENTRO DE ESPECIALIDADES MEDICAS",
                         "descricao_interna_procedimento": "CONSULTA EM NEUROLOGIA",
                         "status_solicitacao": "AGENDAMENTO / CONFIRMADO / EXECUTANTE",
+                        "data_marcacao": "2026-07-20T14:30:00Z",
                         "tipo_registro": "AMBULATORIAL",
                         "is_telessaude": True
                     }
                 },
+                {
+                    "_source": {
+                        "codigo_solicitacao": "HOSP-002",
+                        "no_usuario": "PACIENTE TESTE COMPLETO",
+                        "no_mae_usuario": "MARIA DE TESTE",
+                        "dt_nascimento_usuario": "1990-05-15",
+                        "endereco_completo": "RUA TESTE, 123",
+                        "telefone_unificado": "67999999999",
+                        "data_solicitacao": "2026-06-05T09:00:00Z",
+                        "nome_unidade_executante": "HOSPITAL REGIONAL",
+                        "descricao_interna_procedimento": "CIRURGIA DE APÊNDICE",
+                        "status_solicitacao": "APROVADA",
+                        "data_reserva": "2026-08-10T08:00:00Z",
+                        "tipo_registro": "HOSPITALAR",
+                        "is_telessaude": False
+                    }
+                },
+                {
+                    "_source": {
+                        "codigo_solicitacao": "AMB-003",
+                        "no_usuario": "PACIENTE TESTE COMPLETO",
+                        "no_mae_usuario": "MARIA DE TESTE",
+                        "dt_nascimento_usuario": "1990-05-15",
+                        "endereco_completo": "RUA TESTE, 123",
+                        "telefone_unificado": "67999999999",
+                        "data_solicitacao": "2026-06-10T14:00:00Z",
+                        "nome_unidade_executante": "POSTO DE SAUDE CENTRAL",
+                        "descricao_interna_procedimento": "DERMATOLOGIA",
+                        "status_solicitacao": "SOLICITAÇÃO / PENDENTE / REGULADOR",
+                        "tipo_registro": "AMBULATORIAL",
+                        "is_telessaude": False
+                    }
+                },
+                {
+                    "_source": {
+                        "codigo_solicitacao": "CANCEL-004",
+                        "no_usuario": "PACIENTE TESTE COMPLETO",
+                        "no_mae_usuario": "MARIA DE TESTE",
+                        "dt_nascimento_usuario": "1990-05-15",
+                        "endereco_completo": "RUA TESTE, 123",
+                        "telefone_unificado": "67999999999",
+                        "data_solicitacao": "2026-06-15T08:00:00Z",
+                        "nome_unidade_executante": "UPA ZONA NORTE",
+                        "descricao_interna_procedimento": "ORTOPEDIA",
+                        "status_solicitacao": "SOLICITAÇÃO / CANCELADA / REGULADOR",
+                        "laudo": {"justificativa": "Paciente não compareceu no horário agendado."},
+                        "tipo_registro": "AMBULATORIAL",
+                        "is_telessaude": False
+                    }
+                }
             ]
         # =========================================================
         

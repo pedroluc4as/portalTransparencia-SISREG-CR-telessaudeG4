@@ -605,6 +605,8 @@ function App() {
       lista = lista.filter(item => item._source?.tipo_registro === 'HOSPITALAR');
     } else if (filtroTipo === 'AMBULATORIAL') {
       lista = lista.filter(item => item._source?.tipo_registro !== 'HOSPITALAR');
+    } else if (filtroTipo === 'TELESSAUDE') {
+      lista = lista.filter(item => item._source?.is_telessaude === true);
     }
 
     if (filtroSituacao !== 'TODOS') {
@@ -893,6 +895,7 @@ function App() {
                   <option value="TODOS">Todos os Tipos</option>
                   <option value="AMBULATORIAL">Ambulatorial</option>
                   <option value="HOSPITALAR">Hospitalar</option>
+                  <option value="TELESSAUDE">Telessaúde</option>
                 </select>
 
                 <select 
@@ -1038,7 +1041,23 @@ function App() {
                             <strong>HOSPITALAR</strong>
                           </div>
                         )}
-
+                        {source.is_telessaude && (
+                          <div style={{
+                            backgroundColor: '#f3e8ff',
+                            color: '#7e22ce',
+                            border: '1px solid #d8b4fe',
+                            padding: '4px 12px',
+                            borderRadius: '6px',
+                            fontSize: '11px',
+                            fontWeight: '800',
+                            textAlign: 'center',
+                            textTransform: 'uppercase',
+                            width: '100%',
+                            boxSizing: 'border-box'
+                          }}>
+                            <strong>TELESSAÚDE</strong>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1112,6 +1131,20 @@ function App() {
                         <span className="texto-cancelamento">{motivoCancelamento}</span>
                      </div>
                     )}
+
+                    {source.is_telessaude && (
+                      <div style={{ backgroundColor: '#f3e8ff', border: '1px solid #d8b4fe', borderRadius: '6px', padding: '12px', marginTop: '12px' }}>
+                        <strong style={{ color: '#295fd2', display: 'block', marginBottom: '6px' }}>
+                          ORIENTAÇÕES SOBRE A TELESSAÚDE
+                        </strong>
+                        <span style={{ color: '#581c87', fontSize: '14px', display: 'block', lineHeight: '1.5' }}>
+                          Este agendamento será realizado na modalidade virtual. Na nossa rede, atendimentos específicos como Neurologia, Endocrinologia, Psicologia, Psiquiatria e Neuropediatria nas unidades de referência contam com essa tecnologia. 
+                          <br/><br/>
+                          <strong>Como funciona?</strong> Você deve comparecer presencialmente à Unidade Executante no dia e horário marcados. A nossa equipe de enfermagem vai te receber, preparar o consultório e estabelecer a conexão de vídeo segura com o médico especialista para você.
+                        </span>
+                      </div>
+                    )}
+                    {/* ========================================================= */}
                     
                   </div>
                 </div>
